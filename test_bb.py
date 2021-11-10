@@ -1,6 +1,7 @@
 import unittest
 import pandas as pd
-from BB import *
+from bryboschan import *
+from turningpoint import *
 
 
 class TestBB(unittest.TestCase):
