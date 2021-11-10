@@ -12,7 +12,7 @@ For example:
 Call function dating() with appropriate parameters for dating the time series
 
 For example:
-    dating(s, 5, 2, width=3, min_dur=6, min_pha=3, min_boudary=3)
+    dating(s, ma=[5, 2], width=3, min_dur=6, min_pha=3, min_boudary=3)
     will apply the procedure to 3 curves: the MA-5, MA-2, and the original curve s
 
     dating(s, width=3, min_dur=6, min_pha=3, min_boudary=3)
@@ -147,7 +147,7 @@ class BBSeries(object):
         min_pha=3,
         min_boudary=3,
         spencer=False,
-        verbose=True,
+        verbose=False,
     ):
         """
         Bry and Boschan dating process for identifying turning points
@@ -199,6 +199,8 @@ class BBSeries(object):
                 # plot turns on the series
                 curve.plot_turns(turns)
 
+        if not verbose:
+            self.plot_turns(turns)
         return turns
 
 
@@ -210,7 +212,7 @@ def dating(
     min_pha=3,
     min_boudary=3,
     spencer=False,
-    verbose=True,
+    verbose=False,
 ):
     """
     Bry and Boschan dating process for identifying turning points
@@ -257,20 +259,22 @@ def tester(width=3, min_pha=3):
         if mode == "-s":
             width = int(args[1])
             min_pha = int(args[2])
-            dating(s, width=width, min_pha=min_pha)
+            turns = dating(s, width=width, min_pha=min_pha)
         elif mode == "-m":
             ma1 = int(args[1])
             ma2 = int(args[2])
             width = int(args[3])
             min_pha = int(args[4])
-            dating(
+            turns = dating(
                 s,
                 ma=[ma1, ma2],
                 width=width,
                 min_pha=min_pha,
             )
     else:
-        dating(s, width=width, min_pha=min_pha)
+        turns = dating(s, width=width, min_pha=min_pha)
+
+    print(turns)
 
 
 if __name__ == "__main__":
