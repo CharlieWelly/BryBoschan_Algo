@@ -13,11 +13,8 @@ class TurningPoint(object):
         self.sta = sta
         self.val = val
 
-    def __str__(self):
-        return "%s: %s: %.2f" % (self.sta, self.dti, self.val)
-
     def __repr__(self):
-        return "%s: %s: %.2f" % (self.sta, self.dti, self.val)
+        return "<%s: %s: %.2f>" % (self.sta, self.dti, self.val)
 
     def __gt__(self, other):
         return self.val > other.val
@@ -38,7 +35,7 @@ class TurningPoint(object):
         return abs((self.dti - other.dti).n)
 
 
-def duration_check(turnings, min_dur):
+def duration_check(turnings, min_dur, verbose=False):
     """Check for minimum duration of a cycle
 
     :param turnings: list of TurningPoint objects
@@ -49,26 +46,32 @@ def duration_check(turnings, min_dur):
     :rtype: list
     """
     i = 0
+
     while i < len(turnings) - 2:
-        if (turnings[i + 2].dti - turnings[i].dti).n < min_dur:
+        printed = None
+        if TurningPoint.time_diff(turnings[i], turnings[i + 2]) < min_dur:
             if turnings[i].sta == "P":
                 if turnings[i + 2] >= turnings[i]:
-                    turnings.pop(i)
+                    printed = turnings.pop(i)
                 else:
-                    turnings.pop(i + 2)
+                    printed = turnings.pop(i + 2)
             else:
                 if turnings[i] >= turnings[i + 1]:
-                    turnings.pop(i)
+                    printed = turnings.pop(i)
                 else:
-                    turnings.pop(i + 1)
-            turnings = alternation_check(turnings)
-            turnings = duration_check(turnings, min_dur)
+                    printed = turnings.pop(i + 1)
+            if verbose:
+                print("remove %s: failed duration check" % printed)
+
+            turnings = alternation_check(turnings, verbose)
+            turnings = duration_check(turnings, min_dur, verbose)
+
         else:
             i += 1
     return turnings
 
 
-def alternation_check(turnings):
+def alternation_check(turnings, verbose=False):
     """Check for Alternation of Peaks and Troughs
 
     :param turnings: list of TurningPoint objects
@@ -76,25 +79,28 @@ def alternation_check(turnings):
     """
     i = 0
     while i < len(turnings) - 1:
+        printed = None
         if turnings[i].sta == turnings[i + 1].sta:
             if turnings[i].sta == "P":
                 if turnings[i] <= turnings[i + 1]:
-                    turnings.pop(i)
+                    printed = turnings.pop(i)
                 else:
-                    turnings.pop(i + 1)
+                    printed = turnings.pop(i + 1)
                     i += 1
             elif turnings[i].sta == "T":
                 if turnings[i] >= turnings[i + 1]:
-                    turnings.pop(i)
+                    printed = turnings.pop(i)
                 else:
-                    turnings.pop(i + 1)
+                    printed = turnings.pop(i + 1)
                     i += 1
+            if verbose:
+                print("remove %s: failed alternation check" % printed)
         else:
             i += 1
     return turnings
 
 
-def phase_check(turnings, min_pha):
+def phase_check(turnings, min_pha, verbose=False):
     """
     Check for minimum duration of phase
 
@@ -107,8 +113,11 @@ def phase_check(turnings, min_pha):
     """
     i = 0
     while i < len(turnings) - 1:
+        printed = None
         if TurningPoint.time_diff(turnings[i], turnings[i + 1]) < min_pha:
-            turnings.pop(i + 1)
+            printed = turnings.pop(i + 1)
+            if verbose:
+                print("remove %s: failed phase_check" % printed)
             turnings = alternation_check(turnings)
             turnings = phase_check(turnings, min_pha)
         else:
@@ -116,7 +125,7 @@ def phase_check(turnings, min_pha):
     return turnings
 
 
-def start_end_check(turnings, curve, min_boudary):
+def start_end_check(turnings, curve, min_boudary, verbose=False):
     """
     Remove turns that too close to the begining and end of the series
 
@@ -129,8 +138,11 @@ def start_end_check(turnings, curve, min_boudary):
     :return: list of evaluated TurningPoint objects
     :rtype: list
     """
+    printed = None
     if turnings[0].dti < curve.beginDate + min_boudary:
-        turnings.pop(0)
+        printed = turnings.pop(0)
     if turnings[-1].dti > curve.endDate - min_boudary:
-        turnings.pop(-1)
+        printed = turnings.pop(-1)
+    if verbose and printed:
+        print("remove %s: falied start_end_check" % printed)
     return turnings

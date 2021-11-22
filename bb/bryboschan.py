@@ -49,7 +49,18 @@ class BBSeries(object):
         self.beginDate = series.index[0]
         self.endDate = series.index[-1]
 
-    def draw_ma(self, window):
+    def rm_outliers(self, threshold, verbose=False):
+        spcer = self.draw_spencer()
+        stdv = spcer.series.std()
+        mean = spcer.series.mean()
+        upper = mean + threshold * stdv
+        lower = mean - threshold * stdv
+        outliers = self.series.loc[(self.series > upper) | (self.series < lower)]
+        if verbose and len(outliers) > 0:
+            print("Outliers:\n%s" % outliers)
+        return self.series.clip(lower, upper)
+
+    def draw_ma(self, *parg, window):
         """draw the moving average curve
 
         :param window: number of time-interval to calculate moving average
@@ -57,10 +68,11 @@ class BBSeries(object):
         :return: BBSeries object of moving average curve
         :rtype: BBSeries object
         """
-        ma = self.series.rolling(window=window).mean().dropna()
+        series = parg[0] if parg else self.series
+        ma = series.rolling(window=window).mean().dropna()
         return BBSeries(ma, self.start, self.freq, "ma-%s" % window)
 
-    def draw_spencer(self, window=5, weights=[-3, 12, 17, 12, -3]):
+    def draw_spencer(self, *parg, window=5, weights=[-3, 12, 17, 12, -3]):
         """draw spencer curve
 
         :param window: number of time interval for spencer curve, defaults to 5
@@ -70,7 +82,8 @@ class BBSeries(object):
         :return: BBSeries object of spencer curve
         :rtype: BBSeries object
         """
-        spencer = self.series.rolling(window=window, center=True).apply(
+        series = parg[0] if parg else self.series
+        spencer = series.rolling(window=window, center=True).apply(
             lambda seq: np.average(seq, weights=weights)
         )
         return BBSeries(
@@ -154,7 +167,9 @@ class BBSeries(object):
         min_dur=6,
         min_pha=3,
         min_boudary=3,
+        threshold=3.5,
         spencer=False,
+        rm_outliers=False,
         verbose=False,
     ):
         """
@@ -177,10 +192,20 @@ class BBSeries(object):
         """
 
         sepline = sepchr * seplen
-        curves = [self.draw_ma(window) for window in sorted(ma, reverse=True)]
+
+        series = (
+            self.rm_outliers(threshold=threshold, verbose=verbose)
+            if rm_outliers
+            else self.series
+        )
+
+        curves = [
+            self.draw_ma(series, window=window) for window in sorted(ma, reverse=True)
+        ]
         curves.append(self)
+
         if spencer and ma:
-            curves.insert(1, self.draw_spencer())
+            curves.insert(1, self.draw_spencer(series))
 
         for idx, curve in enumerate(curves):
             if idx == 0:
@@ -188,20 +213,25 @@ class BBSeries(object):
             else:
                 turns = curve.re_apply(turns, width=width)
 
-            turningpoint.alternation_check(turns)
-            turningpoint.duration_check(turns, min_dur=min_dur)
-            turningpoint.phase_check(turns, min_pha=min_pha)
-
-            if curve.name == "original":
-                turningpoint.start_end_check(turns, self, min_boudary=min_boudary)
-
             if verbose:
-                # print turns information
+                # print initial information
                 print(sepline)
                 print(
                     "dating: %s | width: %s | min_dur: %s | min_pha: %s"
                     % (curve.name, width, min_dur, min_pha)
                 )
+
+            turningpoint.alternation_check(turns, verbose=verbose)
+            turningpoint.duration_check(turns, min_dur=min_dur, verbose=verbose)
+            turningpoint.phase_check(turns, min_pha=min_pha, verbose=verbose)
+
+            if curve.name == "original":
+                turningpoint.start_end_check(
+                    turns, self, min_boudary=min_boudary, verbose=verbose
+                )
+
+            if verbose:
+                # print result cycle
                 for num, turn in enumerate(turns):
                     print("(%02d) %s" % (num, turn))
                 # plot turns on the series
@@ -216,7 +246,9 @@ def dating(
     min_dur=6,
     min_pha=3,
     min_boudary=3,
+    threshold=3.5,
     spencer=False,
+    rm_outliers=False,
     verbose=False,
 ):
     """
@@ -244,7 +276,9 @@ def dating(
         min_dur=min_dur,
         min_pha=min_pha,
         min_boudary=min_boudary,
+        threshold=threshold,
         spencer=spencer,
+        rm_outliers=rm_outliers,
         verbose=verbose,
     )
 
