@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
-from bryboschan import *
-from turningpoint import *
+from bb.bryboschan import *
+from bb.turningpoint import *
 
 
 class TestBB(unittest.TestCase):
@@ -57,7 +57,7 @@ class TestBB(unittest.TestCase):
             [1000, 2000, -2000, 3000, -4000, 6000, 2000, 100, 1000, -2000],
             index=self.dti1,
         )
-        self.s = BBSeries(self.s)
+        self.s = BBSeries(self.s, start="2003", freq="Q")
         self.turns4 = [
             TurningPoint(self.dti1[1], "P", 2000),
             TurningPoint(self.dti1[6], "T", 2000),

@@ -25,20 +25,26 @@ For example:
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import turningpoint
+from . import turningpoint
 
 seplen = 60
 sepchr = "-"
 
 
 class BBSeries(object):
-    def __init__(self, series, name="original"):
+    def __init__(self, series, start, freq, name="original"):
         """Init BB object
 
         :param series: time series for dating
         :type series: pandas series object
         """
-        self.s = series
+        self.series = series
+        self.start = start
+        self.freq = freq
+        self.idx = pd.period_range(
+            start=self.start, periods=len(self.series), freq=self.freq
+        )
+        self.series.index = self.idx
         self.name = name
         self.beginDate = series.index[0]
         self.endDate = series.index[-1]
@@ -51,8 +57,8 @@ class BBSeries(object):
         :return: BBSeries object of moving average curve
         :rtype: BBSeries object
         """
-        ma = self.s.rolling(window=window).mean().dropna()
-        return BBSeries(ma, "ma-%s" % window)
+        ma = self.series.rolling(window=window).mean().dropna()
+        return BBSeries(ma, self.start, self.freq, "ma-%s" % window)
 
     def draw_spencer(self, window=5, weights=[-3, 12, 17, 12, -3]):
         """draw spencer curve
@@ -64,10 +70,12 @@ class BBSeries(object):
         :return: BBSeries object of spencer curve
         :rtype: BBSeries object
         """
-        spencer = self.s.rolling(window=window, center=True).apply(
+        spencer = self.series.rolling(window=window, center=True).apply(
             lambda seq: np.average(seq, weights=weights)
         )
-        return BBSeries(spencer, "spencer-curve-%s-%s" % (window, weights))
+        return BBSeries(
+            spencer, self.start, self.freq, "spencer-curve-%s-%s" % (window, weights)
+        )
 
     def _maxima(self, width):
         """find local peak
@@ -78,9 +86,9 @@ class BBSeries(object):
         :rtype: list
         """
         peaks = []
-        for i in self.s.index[width:-width]:
-            if max(self.s[i - width : i + width]) == self.s[i]:
-                peaks.append(turningpoint.TurningPoint(i, "P", self.s[i]))
+        for i in self.series.index[width:-width]:
+            if max(self.series[i - width : i + width]) == self.series[i]:
+                peaks.append(turningpoint.TurningPoint(i, "P", self.series[i]))
         return peaks
 
     def _minima(self, width):
@@ -92,9 +100,9 @@ class BBSeries(object):
         :rtype: list
         """
         troughs = []
-        for i in self.s.index[width:-width]:
-            if min(self.s[i - width : i + width]) == self.s[i]:
-                troughs.append(turningpoint.TurningPoint(i, "T", self.s[i]))
+        for i in self.series.index[width:-width]:
+            if min(self.series[i - width : i + width]) == self.series[i]:
+                troughs.append(turningpoint.TurningPoint(i, "T", self.series[i]))
         return troughs
 
     def get_turnings(self, width):
@@ -120,7 +128,7 @@ class BBSeries(object):
         """
         new = []
         for p in turnings:
-            temp = self.s[p.dti - width : p.dti + width]
+            temp = self.series[p.dti - width : p.dti + width]
             id = temp.idxmax() if p.sta == "P" else temp.idxmin()
             new.append(turningpoint.TurningPoint(id, p.sta, temp[id]))
         return new
@@ -134,7 +142,7 @@ class BBSeries(object):
         :type turns: list
         """
         fig, ax = plt.subplots()
-        self.s.plot()
+        self.series.plot()
         for turn in turns:
             ax.annotate("x", xy=(turn.dti, turn.val))
         plt.show()
@@ -198,14 +206,11 @@ class BBSeries(object):
                     print("(%02d) %s" % (num, turn))
                 # plot turns on the series
                 curve.plot_turns(turns)
-
-        if not verbose:
-            self.plot_turns(turns)
         return turns
 
 
 def dating(
-    s,
+    series,
     ma=[],
     width=3,
     min_dur=6,
@@ -232,7 +237,7 @@ def dating(
     :return: list of final TurningPoint objects
     :rtype: list
     """
-    original = BBSeries(s)
+    original = BBSeries(series)
     turns = original.dating(
         ma=ma,
         width=width,
@@ -244,38 +249,3 @@ def dating(
     )
 
     return turns
-
-
-def tester(width=3, min_pha=3):
-    import sys
-
-    df = pd.read_csv("./test_series.csv")
-    s = df["CYCLE_LOGGDP2010B"]
-    s.index = pd.period_range(start="2003", freq="Q", periods=len(s))
-    args = sys.argv[1:]
-
-    if len(args) > 0:
-        mode = args[0]
-        if mode == "-s":
-            width = int(args[1])
-            min_pha = int(args[2])
-            turns = dating(s, width=width, min_pha=min_pha)
-        elif mode == "-m":
-            ma1 = int(args[1])
-            ma2 = int(args[2])
-            width = int(args[3])
-            min_pha = int(args[4])
-            turns = dating(
-                s,
-                ma=[ma1, ma2],
-                width=width,
-                min_pha=min_pha,
-            )
-    else:
-        turns = dating(s, width=width, min_pha=min_pha)
-
-    print(turns)
-
-
-if __name__ == "__main__":
-    tester()
